@@ -1,0 +1,17 @@
+name: StellarRedeem
+version: '${version}'
+main: org.stellarvan.stellarRedeem.StellarRedeem
+api-version: '1.21'
+folia-supported: false
+commands:
+  redeem:
+    description: Redeem a gift code
+    usage: /redeem <code>
+    aliases:
+      - cdkey
+      - key
+permissions:
+  stellarredeem.redeem:
+    default: true
+  stellarredeem.admin:
+    default: op

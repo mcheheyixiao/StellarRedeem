@@ -1,0 +1,29 @@
+api:
+  base-url: "https://www.stellarvan.cn"
+  server-id: "survival-1"
+  server-secret: "CHANGE_ME"
+  timeout-ms: 5000
+
+redeem:
+  cooldown-seconds: 5
+  case-insensitive: true
+  allow-console: false
+
+command:
+  stop-on-first-failure: true
+  log-executed-commands: true
+
+heartbeat:
+  enabled: true
+  interval-seconds: 60
+
+messages:
+  only-player: "&cThis command can only be used by players."
+  no-permission: "&c你没有权限使用卡密兑换。"
+  usage: "&e用法：/redeem <卡密>"
+  cooldown: "&c请稍候 {seconds} 秒后再兑换。"
+  processing: "&e正在验证卡密，请稍候..."
+  success: "&a兑换成功，奖励已发放。"
+  invalid: "&c卡密无效、已过期或已被使用。"
+  failed: "&c兑换失败，请联系管理员。"
+  api-error: "&c兑换服务暂时不可用，请稍后再试。"
