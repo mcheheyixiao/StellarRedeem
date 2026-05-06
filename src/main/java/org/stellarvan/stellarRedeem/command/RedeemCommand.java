@@ -5,20 +5,26 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
+import org.stellarvan.stellarRedeem.StellarRedeem;
 import org.stellarvan.stellarRedeem.config.PluginConfig;
 import org.stellarvan.stellarRedeem.service.RedeemService;
 
 public final class RedeemCommand implements CommandExecutor {
-    private final PluginConfig pluginConfig;
-    private final RedeemService redeemService;
+    private final StellarRedeem plugin;
 
-    public RedeemCommand(PluginConfig pluginConfig, RedeemService redeemService) {
-        this.pluginConfig = pluginConfig;
-        this.redeemService = redeemService;
+    public RedeemCommand(StellarRedeem plugin) {
+        this.plugin = plugin;
     }
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
+        PluginConfig pluginConfig = plugin.getPluginConfig();
+        RedeemService redeemService = plugin.getRedeemService();
+        if (pluginConfig == null || redeemService == null) {
+            sender.sendMessage("StellarRedeem is not ready.");
+            return true;
+        }
+
         if (!(sender instanceof Player player)) {
             sender.sendMessage(pluginConfig.messages().onlyPlayer());
             return true;

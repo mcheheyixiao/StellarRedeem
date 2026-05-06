@@ -10,6 +10,11 @@ commands:
     aliases:
       - cdkey
       - key
+  stellarredeem:
+    description: StellarRedeem admin command
+    usage: /stellarredeem <reload|status|testapi>
+    aliases:
+      - sreedeem
 permissions:
   stellarredeem.redeem:
     default: true

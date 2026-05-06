@@ -9,13 +9,25 @@ public final class PluginConfig {
     private final Redeem redeem;
     private final Command command;
     private final Heartbeat heartbeat;
+    private final Debug debug;
+    private final CallbackRetry callbackRetry;
     private final Messages messages;
 
-    public PluginConfig(Api api, Redeem redeem, Command command, Heartbeat heartbeat, Messages messages) {
+    public PluginConfig(
+            Api api,
+            Redeem redeem,
+            Command command,
+            Heartbeat heartbeat,
+            Debug debug,
+            CallbackRetry callbackRetry,
+            Messages messages
+    ) {
         this.api = api;
         this.redeem = redeem;
         this.command = command;
         this.heartbeat = heartbeat;
+        this.debug = debug;
+        this.callbackRetry = callbackRetry;
         this.messages = messages;
     }
 
@@ -40,18 +52,28 @@ public final class PluginConfig {
                 cfg.getBoolean("heartbeat.enabled", true),
                 cfg.getInt("heartbeat.interval-seconds", 60)
         );
+        Debug debug = new Debug(
+                cfg.getBoolean("debug.enabled", false)
+        );
+        CallbackRetry callbackRetry = new CallbackRetry(
+                cfg.getBoolean("callback-retry.enabled", true),
+                stringValue(cfg, "callback-retry.file", "callback-queue.json"),
+                cfg.getInt("callback-retry.interval-seconds", 30),
+                cfg.getInt("callback-retry.max-attempts", 10),
+                cfg.getInt("callback-retry.max-queue-size", 500)
+        );
         Messages messages = new Messages(
                 colorize(stringValue(cfg, "messages.only-player", "&cThis command can only be used by players.")),
-                colorize(stringValue(cfg, "messages.no-permission", "&c你没有权限使用卡密兑换。")),
-                colorize(stringValue(cfg, "messages.usage", "&e用法：/redeem <卡密>")),
-                colorize(stringValue(cfg, "messages.cooldown", "&c请稍候 {seconds} 秒后再兑换。")),
-                colorize(stringValue(cfg, "messages.processing", "&e正在验证卡密，请稍候...")),
-                colorize(stringValue(cfg, "messages.success", "&a兑换成功，奖励已发放。")),
-                colorize(stringValue(cfg, "messages.invalid", "&c卡密无效、已过期或已被使用。")),
-                colorize(stringValue(cfg, "messages.failed", "&c兑换失败，请联系管理员。")),
-                colorize(stringValue(cfg, "messages.api-error", "&c兑换服务暂时不可用，请稍后再试。"))
+                colorize(stringValue(cfg, "messages.no-permission", "&cYou do not have permission.")),
+                colorize(stringValue(cfg, "messages.usage", "&eUsage: /redeem <code>")),
+                colorize(stringValue(cfg, "messages.cooldown", "&cPlease wait {seconds}s before redeeming again.")),
+                colorize(stringValue(cfg, "messages.processing", "&eVerifying redeem code...")),
+                colorize(stringValue(cfg, "messages.success", "&aRedeem success, rewards delivered.")),
+                colorize(stringValue(cfg, "messages.invalid", "&cInvalid, expired, or already used code.")),
+                colorize(stringValue(cfg, "messages.failed", "&cRedeem failed, contact admin.")),
+                colorize(stringValue(cfg, "messages.api-error", "&cRedeem service is unavailable, try again later."))
         );
-        return new PluginConfig(api, redeem, command, heartbeat, messages);
+        return new PluginConfig(api, redeem, command, heartbeat, debug, callbackRetry, messages);
     }
 
     public Api api() {
@@ -68,6 +90,14 @@ public final class PluginConfig {
 
     public Heartbeat heartbeat() {
         return heartbeat;
+    }
+
+    public Debug debug() {
+        return debug;
+    }
+
+    public CallbackRetry callbackRetry() {
+        return callbackRetry;
     }
 
     public Messages messages() {
@@ -93,6 +123,18 @@ public final class PluginConfig {
     }
 
     public record Heartbeat(boolean enabled, int intervalSeconds) {
+    }
+
+    public record Debug(boolean enabled) {
+    }
+
+    public record CallbackRetry(
+            boolean enabled,
+            String file,
+            int intervalSeconds,
+            int maxAttempts,
+            int maxQueueSize
+    ) {
     }
 
     public record Messages(

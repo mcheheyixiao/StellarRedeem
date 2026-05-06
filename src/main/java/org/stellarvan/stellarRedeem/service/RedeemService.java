@@ -1,8 +1,10 @@
 package org.stellarvan.stellarRedeem.service;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
@@ -12,6 +14,8 @@ import org.stellarvan.stellarRedeem.http.RedeemApiClient;
 import org.stellarvan.stellarRedeem.http.RedeemApiClient.ApiClientException;
 import org.stellarvan.stellarRedeem.http.RedeemApiClient.ClaimRequest;
 import org.stellarvan.stellarRedeem.http.RedeemApiClient.ClaimResult;
+import org.stellarvan.stellarRedeem.retry.CallbackRetryQueue;
+import org.stellarvan.stellarRedeem.retry.PendingCallback;
 import org.stellarvan.stellarRedeem.service.CommandTemplateExecutor.ExecutionResult;
 
 public final class RedeemService {
@@ -32,6 +36,8 @@ public final class RedeemService {
     private final CooldownService cooldownService;
     private final RedeemApiClient apiClient;
     private final CommandTemplateExecutor commandExecutor;
+    private final CallbackRetryQueue callbackRetryQueue;
+    private final Consumer<String> debugLogger;
     private final boolean redeemEnabled;
 
     public RedeemService(
@@ -40,6 +46,8 @@ public final class RedeemService {
             CooldownService cooldownService,
             RedeemApiClient apiClient,
             CommandTemplateExecutor commandExecutor,
+            CallbackRetryQueue callbackRetryQueue,
+            Consumer<String> debugLogger,
             boolean redeemEnabled
     ) {
         this.plugin = plugin;
@@ -47,6 +55,8 @@ public final class RedeemService {
         this.cooldownService = cooldownService;
         this.apiClient = apiClient;
         this.commandExecutor = commandExecutor;
+        this.callbackRetryQueue = callbackRetryQueue;
+        this.debugLogger = debugLogger;
         this.redeemEnabled = redeemEnabled;
     }
 
@@ -74,6 +84,7 @@ public final class RedeemService {
         String playerName = player.getName();
         String worldName = player.getWorld().getName();
 
+        debug("claim request start: player=" + playerName + ", code=" + maskCode(normalizedCode));
         player.sendMessage(pluginConfig.messages().processing());
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> executeRedeem(
                 playerUuid,
@@ -94,6 +105,7 @@ public final class RedeemService {
                     worldName
             ));
         } catch (ApiClientException ex) {
+            debug("claim failed with api error: player=" + playerName + ", code=" + maskCode(code) + ", error=" + ex.getMessage());
             plugin.getLogger().severe(
                     "Claim API request failed for player " + playerName + ", code " + maskCode(code) + ": " + ex.getMessage()
             );
@@ -102,10 +114,14 @@ public final class RedeemService {
         }
 
         if (!claimResult.success()) {
+            debug("claim rejected: player=" + playerName + ", reason=" + claimResult.reason());
             String failureMessage = resolveClaimFailureMessage(claimResult);
             Bukkit.getScheduler().runTask(plugin, () -> sendToOnlinePlayer(playerUuid, failureMessage));
             return;
         }
+
+        long redeemId = claimResult.redeemId() == null ? -1L : claimResult.redeemId();
+        debug("claim success: player=" + playerName + ", redeemId=" + redeemId);
 
         Bukkit.getScheduler().runTask(plugin, () -> {
             ExecutionResult executionResult = commandExecutor.execute(
@@ -119,18 +135,19 @@ public final class RedeemService {
                 sendToOnlinePlayer(playerUuid, pluginConfig.messages().success());
                 Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
                     try {
-                        apiClient.sendComplete(claimResult.redeemId(), executionResult.executedCommands());
+                        apiClient.sendComplete(redeemId, executionResult.executedCommands());
                     } catch (ApiClientException ex) {
                         plugin.getLogger().severe(
-                                "Complete callback failed for redeemId " + claimResult.redeemId() + ": " + ex.getMessage()
+                                "Complete callback failed for redeemId " + redeemId + ": " + ex.getMessage()
                         );
+                        queueCallback(PendingCallback.complete(redeemId, executionResult.executedCommands()));
                     }
                 });
             } else {
                 sendToOnlinePlayer(playerUuid, pluginConfig.messages().failed());
                 plugin.getLogger().severe(
                         "Redeem command failed for redeemId "
-                                + claimResult.redeemId()
+                                + redeemId
                                 + ", command: "
                                 + executionResult.failedCommand()
                                 + ", error: "
@@ -139,19 +156,43 @@ public final class RedeemService {
                 Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
                     try {
                         apiClient.sendFail(
-                                claimResult.redeemId(),
+                                redeemId,
                                 executionResult.failedCommand(),
                                 executionResult.error(),
                                 executionResult.executedCommands()
                         );
                     } catch (ApiClientException ex) {
                         plugin.getLogger().severe(
-                                "Fail callback failed for redeemId " + claimResult.redeemId() + ": " + ex.getMessage()
+                                "Fail callback failed for redeemId " + redeemId + ": " + ex.getMessage()
                         );
+                        queueCallback(PendingCallback.fail(
+                                redeemId,
+                                executionResult.failedCommand(),
+                                executionResult.error(),
+                                executionResult.executedCommands()
+                        ));
                     }
                 });
             }
         });
+    }
+
+    private void queueCallback(PendingCallback callback) {
+        if (callbackRetryQueue == null) {
+            return;
+        }
+
+        boolean queued = callbackRetryQueue.enqueue(callback);
+        if (queued) {
+            plugin.getLogger().warning(
+                    "Callback queued for retry: type=" + callback.getType() + ", redeemId=" + callback.getRedeemId()
+            );
+            debug("callback queued: type=" + callback.getType() + ", redeemId=" + callback.getRedeemId());
+        } else {
+            plugin.getLogger().warning(
+                    "Callback queue rejected callback: type=" + callback.getType() + ", redeemId=" + callback.getRedeemId()
+            );
+        }
     }
 
     private String resolveClaimFailureMessage(ClaimResult claimResult) {
@@ -192,5 +233,11 @@ public final class RedeemService {
             return "****";
         }
         return trimmed.substring(0, 4) + "****" + trimmed.substring(trimmed.length() - 4);
+    }
+
+    private void debug(String message) {
+        if (debugLogger != null) {
+            debugLogger.accept(message);
+        }
     }
 }

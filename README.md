@@ -1,56 +1,151 @@
 # StellarRedeem
 
-StellarRedeem is an independent code-redeem plugin. It only handles `/redeem`, calls StellarWorld, executes returned console commands, and sends complete/fail callbacks.
+StellarRedeem 是独立卡密兑换插件（Redeem V2）。
 
-## What It Does Not Do
+它只负责：
 
-- No web admin panel
-- No local redeem-code database
-- No direct MySQL access
-- No dependency on StellarStatsSync
-- No offline reward queue
-- No automatic command rollback
+- `/redeem` 触发兑换
+- 调用网站 claim API
+- 在主线程执行网站返回命令
+- 回传 complete/fail
+- 在网络抖动时重试 complete/fail 回调
 
-## Commands
+它不负责本地卡密库，不直接连接数据库，不内嵌 Web 后台。
+
+## V2 新增能力
+
+- Callback retry queue（仅 complete/fail 回传）
+- 管理命令 `/stellarredeem`
+- Debug 日志开关
+- 启动检查增强
+
+## 严格边界
+
+- 不保存卡密数据库
+- 不接 MySQL
+- 不重试 claim
+- 不重新执行奖励命令
+- 不自动补发奖励
+- 不改变网站 API 协议和签名格式
+
+## 命令
+
+玩家兑换：
 
 - `/redeem <code>`
 - `/cdkey <code>`
 - `/key <code>`
 
-## Permissions
+管理命令（`stellarredeem.admin`）：
 
-- `stellarredeem.redeem` (default: `true`)
-- `stellarredeem.admin` (default: `op`, bypasses redeem cooldown)
+- `/stellarredeem reload`
+- `/stellarredeem status`
+- `/stellarredeem testapi`
 
-## config.yml
+## 权限
+
+- `stellarredeem.redeem`（default: true）
+- `stellarredeem.admin`（default: op）
+
+## 配置
 
 ```yaml
 api:
-  base-url
-  server-id
-  server-secret
-  timeout-ms
+  base-url: "https://www.stellarvan.cn"
+  server-id: "survival-1"
+  server-secret: "CHANGE_ME"
+  timeout-ms: 5000
 
 redeem:
-  cooldown-seconds
-  case-insensitive
+  cooldown-seconds: 5
+  case-insensitive: true
+  allow-console: false
 
 command:
-  stop-on-first-failure
-  log-executed-commands
+  stop-on-first-failure: true
+  log-executed-commands: true
 
 heartbeat:
-  enabled
-  interval-seconds
+  enabled: true
+  interval-seconds: 60
+
+debug:
+  enabled: false
+
+callback-retry:
+  enabled: true
+  file: "callback-queue.json"
+  interval-seconds: 30
+  max-attempts: 10
+  max-queue-size: 500
 ```
 
-Important:
+## Callback Retry 机制
 
-- `server-secret` must match StellarWorld `REDEEM_PLUGIN_SERVER_SECRET`.
-- `server-id` must match StellarWorld `REDEEM_PLUGIN_SERVER_ID`.
-- Never commit `server-secret` to a public repository.
+- 只重试 `complete` / `fail` 回传
+- 不重试 `claim`
+- 不重新执行命令
+- 不保存卡密
+- 不改变奖励发放状态
 
-## API Signature
+队列文件：
+
+- `plugins/StellarRedeem/callback-queue.json`
+
+队列条目字段：
+
+- `type`（`COMPLETE` / `FAIL`）
+- `redeemId`
+- `executedCommands`
+- `failedCommand`
+- `error`
+- `attempts`
+- `createdAt`
+- `lastAttemptAt`
+
+超过 `max-attempts` 后条目会保留在队列文件中并停止自动重试（用于人工排查）。
+
+## 管理命令说明
+
+`/stellarredeem reload`
+
+- 重载 `config.yml`
+- 重建 API client / RedeemService
+- 重启 heartbeat task
+- 重启 callback retry task
+
+`/stellarredeem status`
+
+- 显示插件状态、Redeem 开关、Base URL、Server ID、Heartbeat、Callback Retry、队列长度、Debug 状态
+- 不显示 `server-secret`
+
+`/stellarredeem testapi`
+
+- 异步发送一次 heartbeat 用于连通性测试
+- 不调用 claim，不执行奖励命令
+
+## 启动检查
+
+启动时会检查：
+
+- `api.base-url` 非空
+- `api.server-id` 非空
+- `api.server-secret` 非空
+- `api.timeout-ms > 0`
+- callback queue 文件可读写（启用 callback-retry 时）
+
+启动日志会输出：
+
+- StellarRedeem enabled
+- Redeem enabled: true/false
+- API base URL
+- Server ID
+- Heartbeat enabled/disabled
+- Callback retry enabled/disabled
+
+不会输出 secret。
+
+## API 签名
 
 Headers:
 
@@ -58,63 +153,23 @@ Headers:
 - `X-Stellar-Timestamp`
 - `X-Stellar-Signature`
 
-Signature format:
+签名格式：
 
 ```text
 hmac_sha256(timestamp + "." + raw_body, server_secret)
 ```
 
-## Required Website Environment Variables
+## 故障处理建议
 
-```dotenv
-REDEEM_CODE_PEPPER=
-REDEEM_PLUGIN_SERVER_ID=survival-1
-REDEEM_PLUGIN_SERVER_SECRET=
-REDEEM_PLUGIN_TIME_WINDOW_SECONDS=300
-```
+- 队列持续增长：优先检查网站 API 可用性、`server-secret`、网络连通性。
+- 出现 exhausted 条目：人工对照网站 `redeem_logs` 和服务器日志排查。
 
-For realtime event sync:
-
-```dotenv
-REALTIME_INTERNAL_EVENT_URL=http://127.0.0.1:3001/internal/events
-REALTIME_INTERNAL_SECRET=
-```
-
-## Build
+## 构建
 
 ```bash
 ./gradlew build
 ```
 
-Artifact:
+产物：
 
-`build/libs/StellarRedeem-1.0.0.jar`
-
-Dependency strategy:
-
-- Gson is set as `compileOnly("com.google.code.gson:gson:2.11.0")`.
-- Gson is not bundled into the plugin jar.
-- Runtime must provide Gson (Paper 1.21+ commonly does).
-
-## Install
-
-1. Put the jar into `plugins/`.
-2. Start the server once to generate `config.yml`.
-3. Stop server or reload first, then set `server-secret`.
-4. Restart server.
-5. Test with `/redeem <code>`.
-
-## FAQ
-
-- `api.server-secret is CHANGE_ME`: redeem is disabled by plugin.
-- HTTP `401` from website: `server-id` or `server-secret` mismatch, or server clock drift exceeds the allowed window.
-- Redeem success but no realtime admin refresh: check StellarWorld -> StellarRealtime `/internal/events` config.
-- Command execution failed: backend will receive `failed`; V1 does not auto-rollback commands.
-- Code always invalid after deploy: verify pepper settings; changing pepper invalidates old codes.
-
-## Security Notes
-
-- Do not log full `server-secret`.
-- Do not log full `X-Stellar-Signature`.
-- Full redeem code is masked in failure log output.
-- `command.log-executed-commands` logs full executed commands. Disable it if commands may contain sensitive data.
+- `build/libs/StellarRedeem-1.0.0.jar`

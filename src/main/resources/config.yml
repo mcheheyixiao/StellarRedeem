@@ -17,13 +17,23 @@ heartbeat:
   enabled: true
   interval-seconds: 60
 
+debug:
+  enabled: false
+
+callback-retry:
+  enabled: true
+  file: "callback-queue.json"
+  interval-seconds: 30
+  max-attempts: 10
+  max-queue-size: 500
+
 messages:
   only-player: "&cThis command can only be used by players."
-  no-permission: "&c你没有权限使用卡密兑换。"
-  usage: "&e用法：/redeem <卡密>"
-  cooldown: "&c请稍候 {seconds} 秒后再兑换。"
-  processing: "&e正在验证卡密，请稍候..."
-  success: "&a兑换成功，奖励已发放。"
-  invalid: "&c卡密无效、已过期或已被使用。"
-  failed: "&c兑换失败，请联系管理员。"
-  api-error: "&c兑换服务暂时不可用，请稍后再试。"
+  no-permission: "&cYou do not have permission."
+  usage: "&eUsage: /redeem <code>"
+  cooldown: "&cPlease wait {seconds}s before redeeming again."
+  processing: "&eVerifying code, please wait..."
+  success: "&aRedeem success, rewards delivered."
+  invalid: "&cInvalid, expired, or already used code."
+  failed: "&cRedeem failed, please contact an admin."
+  api-error: "&cRedeem service is temporarily unavailable. Try again later."
