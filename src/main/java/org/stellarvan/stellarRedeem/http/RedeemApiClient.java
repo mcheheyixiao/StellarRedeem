@@ -41,6 +41,15 @@ public final class RedeemApiClient {
         body.addProperty("playerName", request.playerName());
         body.addProperty("playerUuid", request.playerUuid());
         body.addProperty("world", request.world());
+        if (request.serverVersion() != null) {
+            body.addProperty("serverVersion", request.serverVersion());
+        }
+        if (request.onlinePlayers() != null) {
+            body.addProperty("onlinePlayers", request.onlinePlayers());
+        }
+        if (request.playerIp() != null) {
+            body.addProperty("playerIp", request.playerIp());
+        }
 
         HttpResponse<String> response = postJson("/api/minecraft/redeem/claim", gson.toJson(body));
         String responseBody = response.body() == null ? "" : response.body();
@@ -156,7 +165,16 @@ public final class RedeemApiClient {
         }
     }
 
-    public record ClaimRequest(String code, String serverId, String playerName, String playerUuid, String world) {
+    public record ClaimRequest(
+            String code,
+            String serverId,
+            String playerName,
+            String playerUuid,
+            String world,
+            String serverVersion,
+            Integer onlinePlayers,
+            String playerIp
+    ) {
     }
 
     public record ClaimResult(boolean success, Long redeemId, String reason, String message, List<String> commands) {

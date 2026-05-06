@@ -11,6 +11,7 @@ public final class PluginConfig {
     private final Heartbeat heartbeat;
     private final Debug debug;
     private final CallbackRetry callbackRetry;
+    private final Context context;
     private final Messages messages;
 
     public PluginConfig(
@@ -20,6 +21,7 @@ public final class PluginConfig {
             Heartbeat heartbeat,
             Debug debug,
             CallbackRetry callbackRetry,
+            Context context,
             Messages messages
     ) {
         this.api = api;
@@ -28,6 +30,7 @@ public final class PluginConfig {
         this.heartbeat = heartbeat;
         this.debug = debug;
         this.callbackRetry = callbackRetry;
+        this.context = context;
         this.messages = messages;
     }
 
@@ -62,6 +65,12 @@ public final class PluginConfig {
                 cfg.getInt("callback-retry.max-attempts", 10),
                 cfg.getInt("callback-retry.max-queue-size", 500)
         );
+        Context context = new Context(
+                cfg.getBoolean("context.include-world", true),
+                cfg.getBoolean("context.include-server-version", true),
+                cfg.getBoolean("context.include-online-players", true),
+                cfg.getBoolean("context.include-player-ip", false)
+        );
         Messages messages = new Messages(
                 colorize(stringValue(cfg, "messages.only-player", "&cThis command can only be used by players.")),
                 colorize(stringValue(cfg, "messages.no-permission", "&cYou do not have permission.")),
@@ -73,7 +82,7 @@ public final class PluginConfig {
                 colorize(stringValue(cfg, "messages.failed", "&cRedeem failed, contact admin.")),
                 colorize(stringValue(cfg, "messages.api-error", "&cRedeem service is unavailable, try again later."))
         );
-        return new PluginConfig(api, redeem, command, heartbeat, debug, callbackRetry, messages);
+        return new PluginConfig(api, redeem, command, heartbeat, debug, callbackRetry, context, messages);
     }
 
     public Api api() {
@@ -98,6 +107,10 @@ public final class PluginConfig {
 
     public CallbackRetry callbackRetry() {
         return callbackRetry;
+    }
+
+    public Context context() {
+        return context;
     }
 
     public Messages messages() {
@@ -134,6 +147,14 @@ public final class PluginConfig {
             int intervalSeconds,
             int maxAttempts,
             int maxQueueSize
+    ) {
+    }
+
+    public record Context(
+            boolean includeWorld,
+            boolean includeServerVersion,
+            boolean includeOnlinePlayers,
+            boolean includePlayerIp
     ) {
     }
 

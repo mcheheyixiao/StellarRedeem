@@ -1,6 +1,6 @@
 # StellarRedeem
 
-StellarRedeem 是独立卡密兑换插件（Redeem V2）。
+StellarRedeem 是独立卡密兑换插件（Redeem V1/V2/V3）。
 
 它只负责：
 
@@ -12,6 +12,14 @@ StellarRedeem 是独立卡密兑换插件（Redeem V2）。
 
 它不负责本地卡密库，不直接连接数据库，不内嵌 Web 后台。
 
+## Redeem V3：精准投放 / 限定兑换 / 多服规则
+
+V3 插件端职责保持不变，并新增可选上下文上报：
+
+- 插件不做规则判断
+- 插件只提交玩家上下文
+- 规则由 StellarWorld 统一判断
+
 ## V2 新增能力
 
 - Callback retry queue（仅 complete/fail 回传）
@@ -19,10 +27,17 @@ StellarRedeem 是独立卡密兑换插件（Redeem V2）。
 - Debug 日志开关
 - 启动检查增强
 
+## V3 新增能力
+
+- claim payload 增加可选上下文（world / serverVersion / onlinePlayers / playerIp）
+- claim 失败 reason 映射增强（支持限定服务器、限定玩家、账号状态类原因）
+- `/stellarredeem status` 显示 context 开关
+
 ## 严格边界
 
 - 不保存卡密数据库
 - 不接 MySQL
+- 不做卡密规则判断
 - 不重试 claim
 - 不重新执行奖励命令
 - 不自动补发奖励
@@ -78,7 +93,25 @@ callback-retry:
   interval-seconds: 30
   max-attempts: 10
   max-queue-size: 500
+
+context:
+  include-world: true
+  include-server-version: true
+  include-online-players: true
+  include-player-ip: false
 ```
+
+## V3 上下文配置说明
+
+- `context.include-world`：claim payload 是否传世界名
+- `context.include-server-version`：claim payload 是否传服务端版本
+- `context.include-online-players`：claim payload 是否传在线人数
+- `context.include-player-ip`：claim payload 是否传玩家 IP（默认 `false`，不建议开启）
+
+隐私说明：
+
+- `include-player-ip` 默认关闭
+- 若启用，请确保你的隐私政策与服务器规则明确说明用途
 
 ## Callback Retry 机制
 
@@ -116,7 +149,7 @@ callback-retry:
 
 `/stellarredeem status`
 
-- 显示插件状态、Redeem 开关、Base URL、Server ID、Heartbeat、Callback Retry、队列长度、Debug 状态
+- 显示插件状态、Redeem 开关、Base URL、Server ID、Heartbeat、Callback Retry、队列长度、Debug 状态、Context 开关
 - 不显示 `server-secret`
 
 `/stellarredeem testapi`
@@ -158,6 +191,36 @@ Headers:
 ```text
 hmac_sha256(timestamp + "." + raw_body, server_secret)
 ```
+
+## V3 claim 失败 reason 映射
+
+规则：
+
+1. `reason` 属于 API 错误类时，显示 `messages.api-error`
+2. 若网站返回 `message` 非空，优先显示网站 `message`
+3. `reason` 属于无效/限制类时，显示 `messages.invalid`
+4. 其他显示 `messages.failed`
+
+无效/限制类（映射到 `invalid`）：
+
+- `invalid_code`
+- `revoked`
+- `expired`
+- `used_up`
+- `category_disabled`
+- `server_not_allowed`（服务器不允许）
+- `player_not_allowed`（玩家不匹配）
+- `bound_account_required`（需要绑定网站账号）
+- `email_not_verified`（需要邮箱验证）
+- `account_not_active`（账号状态异常）
+- `per_player_limit_reached`（该玩家达到兑换次数限制）
+- `per_account_limit_reached`（该网站账号达到兑换次数限制）
+
+API 错误类（映射到 `api-error`）：
+
+- `rule_invalid`
+- `internal_error`
+- `server_auth_failed`
 
 ## 故障处理建议
 

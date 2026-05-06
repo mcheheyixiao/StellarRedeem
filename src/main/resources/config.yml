@@ -27,6 +27,12 @@ callback-retry:
   max-attempts: 10
   max-queue-size: 500
 
+context:
+  include-world: true
+  include-server-version: true
+  include-online-players: true
+  include-player-ip: false
+
 messages:
   only-player: "&cThis command can only be used by players."
   no-permission: "&cYou do not have permission."

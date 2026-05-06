@@ -82,6 +82,10 @@ public final class StellarRedeem extends JavaPlugin {
         sender.sendMessage("- Callback retry: " + (callbackRetryActive ? "enabled" : "disabled"));
         sender.sendMessage("- Callback queue size: " + getCallbackQueueSize());
         sender.sendMessage("- Debug enabled: " + cfg.debug().enabled());
+        sender.sendMessage("- Context world: " + cfg.context().includeWorld());
+        sender.sendMessage("- Context server version: " + cfg.context().includeServerVersion());
+        sender.sendMessage("- Context online players: " + cfg.context().includeOnlinePlayers());
+        sender.sendMessage("- Context player IP: " + cfg.context().includePlayerIp());
     }
 
     public void handleTestApiCommand(CommandSender sender) {

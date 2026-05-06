@@ -1,6 +1,5 @@
 package org.stellarvan.stellarRedeem.service;
 
-import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -24,9 +23,17 @@ public final class RedeemService {
             "revoked",
             "expired",
             "used_up",
-            "category_disabled"
+            "category_disabled",
+            "server_not_allowed",
+            "player_not_allowed",
+            "bound_account_required",
+            "email_not_verified",
+            "account_not_active",
+            "per_player_limit_reached",
+            "per_account_limit_reached"
     );
     private static final Set<String> API_ERROR_REASONS = Set.of(
+            "rule_invalid",
             "server_auth_failed",
             "internal_error"
     );
@@ -82,19 +89,47 @@ public final class RedeemService {
         String normalizedCode = normalizeCode(rawCode);
         UUID playerUuid = player.getUniqueId();
         String playerName = player.getName();
-        String worldName = player.getWorld().getName();
+        String executionWorldName = player.getWorld().getName();
+        PluginConfig.Context context = pluginConfig.context();
+        String claimWorld = context.includeWorld() ? executionWorldName : "";
+        String serverVersion = context.includeServerVersion() ? resolveServerVersion() : null;
+        Integer onlinePlayers = context.includeOnlinePlayers() ? Bukkit.getOnlinePlayers().size() : null;
+        String playerIp = context.includePlayerIp() ? resolvePlayerIp(player) : null;
 
         debug("claim request start: player=" + playerName + ", code=" + maskCode(normalizedCode));
+        debug(
+                "claim context included: world="
+                        + context.includeWorld()
+                        + ", serverVersion="
+                        + context.includeServerVersion()
+                        + ", onlinePlayers="
+                        + context.includeOnlinePlayers()
+                        + ", playerIp="
+                        + context.includePlayerIp()
+        );
         player.sendMessage(pluginConfig.messages().processing());
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> executeRedeem(
                 playerUuid,
                 playerName,
-                worldName,
+                executionWorldName,
+                claimWorld,
+                serverVersion,
+                onlinePlayers,
+                playerIp,
                 normalizedCode
         ));
     }
 
-    private void executeRedeem(UUID playerUuid, String playerName, String worldName, String code) {
+    private void executeRedeem(
+            UUID playerUuid,
+            String playerName,
+            String executionWorldName,
+            String claimWorld,
+            String serverVersion,
+            Integer onlinePlayers,
+            String playerIp,
+            String code
+    ) {
         ClaimResult claimResult;
         try {
             claimResult = apiClient.claimCode(new ClaimRequest(
@@ -102,7 +137,10 @@ public final class RedeemService {
                     pluginConfig.api().serverId(),
                     playerName,
                     playerUuid.toString(),
-                    worldName
+                    claimWorld,
+                    serverVersion,
+                    onlinePlayers,
+                    playerIp
             ));
         } catch (ApiClientException ex) {
             debug("claim failed with api error: player=" + playerName + ", code=" + maskCode(code) + ", error=" + ex.getMessage());
@@ -114,7 +152,7 @@ public final class RedeemService {
         }
 
         if (!claimResult.success()) {
-            debug("claim rejected: player=" + playerName + ", reason=" + claimResult.reason());
+            debug("claim rejected reason=" + claimResult.reason() + ", player=" + playerName);
             String failureMessage = resolveClaimFailureMessage(claimResult);
             Bukkit.getScheduler().runTask(plugin, () -> sendToOnlinePlayer(playerUuid, failureMessage));
             return;
@@ -127,7 +165,7 @@ public final class RedeemService {
             ExecutionResult executionResult = commandExecutor.execute(
                     playerName,
                     playerUuid.toString(),
-                    worldName,
+                    executionWorldName,
                     claimResult.commands()
             );
 
@@ -196,20 +234,34 @@ public final class RedeemService {
     }
 
     private String resolveClaimFailureMessage(ClaimResult claimResult) {
-        if (claimResult.reason() != null) {
-            String reason = claimResult.reason().toLowerCase(Locale.ROOT);
-            if (INVALID_REASONS.contains(reason)) {
-                return pluginConfig.messages().invalid();
-            }
-            if (API_ERROR_REASONS.contains(reason)) {
-                return pluginConfig.messages().apiError();
-            }
+        String reason = claimResult.reason() == null ? null : claimResult.reason().toLowerCase(Locale.ROOT);
+        if (reason != null && API_ERROR_REASONS.contains(reason)) {
+            return pluginConfig.messages().apiError();
         }
 
         if (claimResult.message() != null && !claimResult.message().isBlank()) {
             return ChatColor.translateAlternateColorCodes('&', claimResult.message());
         }
+
+        if (reason != null && INVALID_REASONS.contains(reason)) {
+            return pluginConfig.messages().invalid();
+        }
         return pluginConfig.messages().failed();
+    }
+
+    private String resolveServerVersion() {
+        try {
+            return Bukkit.getName() + " " + Bukkit.getMinecraftVersion();
+        } catch (NoSuchMethodError ignored) {
+            return Bukkit.getName() + " " + Bukkit.getBukkitVersion();
+        }
+    }
+
+    private String resolvePlayerIp(Player player) {
+        if (player.getAddress() == null || player.getAddress().getAddress() == null) {
+            return "";
+        }
+        return player.getAddress().getAddress().getHostAddress();
     }
 
     private void sendToOnlinePlayer(UUID uuid, String message) {
