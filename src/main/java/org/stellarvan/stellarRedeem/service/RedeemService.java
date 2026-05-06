@@ -17,9 +17,14 @@ import org.stellarvan.stellarRedeem.service.CommandTemplateExecutor.ExecutionRes
 public final class RedeemService {
     private static final Set<String> INVALID_REASONS = Set.of(
             "invalid_code",
-            "expired_code",
-            "used_code",
-            "already_used"
+            "revoked",
+            "expired",
+            "used_up",
+            "category_disabled"
+    );
+    private static final Set<String> API_ERROR_REASONS = Set.of(
+            "server_auth_failed",
+            "internal_error"
     );
 
     private final JavaPlugin plugin;
@@ -150,8 +155,14 @@ public final class RedeemService {
     }
 
     private String resolveClaimFailureMessage(ClaimResult claimResult) {
-        if (claimResult.reason() != null && INVALID_REASONS.contains(claimResult.reason())) {
-            return pluginConfig.messages().invalid();
+        if (claimResult.reason() != null) {
+            String reason = claimResult.reason().toLowerCase(Locale.ROOT);
+            if (INVALID_REASONS.contains(reason)) {
+                return pluginConfig.messages().invalid();
+            }
+            if (API_ERROR_REASONS.contains(reason)) {
+                return pluginConfig.messages().apiError();
+            }
         }
 
         if (claimResult.message() != null && !claimResult.message().isBlank()) {
