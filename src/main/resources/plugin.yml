@@ -12,7 +12,7 @@ commands:
       - key
   stellarredeem:
     description: StellarRedeem admin command
-    usage: /stellarredeem <reload|status|testapi>
+    usage: /stellarredeem <help|reload|status|doctor|testapi>
     aliases:
       - sreedeem
 permissions:

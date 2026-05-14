@@ -53,8 +53,12 @@ V3 插件端职责保持不变，并新增可选上下文上报：
 
 管理命令（`stellarredeem.admin`）：
 
+- `/stellarredeem help`
 - `/stellarredeem reload`
+- `/stellarredeem reload messages`
+- `/stellarredeem reload api`
 - `/stellarredeem status`
+- `/stellarredeem doctor`
 - `/stellarredeem testapi`
 
 ## 权限
@@ -99,7 +103,21 @@ context:
   include-server-version: true
   include-online-players: true
   include-player-ip: false
+
+messages:
+  prefix: "&8[&b繁星&f兑换&8] "
+  only-player: "&c该指令只能由玩家在游戏内使用。"
+  no-permission: "&c你没有使用卡密兑换的权限。"
+  usage: "&e用法：&f/redeem <卡密>"
+  cooldown: "&7星轨尚未冷却，请在 &e{seconds} &7秒后再试。"
+  processing: "&7正在核验星契，请稍候..."
+  success: "&a兑换成功！&7奖励已送达你的冒险旅程。"
+  invalid: "&c这份星契已失效、过期，或已被使用。"
+  failed: "&c兑换流程出现异常，请联系管理员处理。"
+  api-error: "&c星契服务暂时无法响应，请稍后再试。"
 ```
+
+`messages.prefix` 用于统一玩家消息和管理命令前缀，支持配置为空字符串 `""` 以关闭前缀；旧配置缺少该项时会回退到默认前缀。
 
 ## V3 上下文配置说明
 
@@ -140,17 +158,46 @@ context:
 
 ## 管理命令说明
 
+`/stellarredeem help`
+
+- 显示管理命令帮助
+
 `/stellarredeem reload`
 
 - 重载 `config.yml`
 - 重建 API client / RedeemService
 - 重启 heartbeat task
 - 重启 callback retry task
+- 失败时保留旧 runtime
+
+`/stellarredeem reload messages`
+
+- 重新读取消息配置
+- 不重建 API client
+- 不重启 heartbeat task
+- 不重启 callback retry task
+
+`/stellarredeem reload api`
+
+- 重载 API 相关配置
+- 重建 API client / RedeemService
+- 重启 heartbeat task
+- 重启 callback retry task
+- 失败时保留旧 runtime
 
 `/stellarredeem status`
 
-- 显示插件状态、Redeem 开关、Base URL、Server ID、Heartbeat、Callback Retry、队列长度、Debug 状态、Context 开关
-- 不显示 `server-secret`
+- 显示插件状态、Redeem 开关、Base URL、Server ID、Server Secret 脱敏状态、Heartbeat、Callback Retry、队列长度、Debug 状态、Context 开关
+- 不显示 `server-secret` 原文
+
+`/stellarredeem doctor`
+
+- 输出脱敏诊断报告
+- 不执行兑换，不调用 claim
+- 不显示 `server-secret` 原文
+- 不显示完整卡密
+- 不显示玩家 IP
+- API 连通性测试请使用 `/stellarredeem testapi`
 
 `/stellarredeem testapi`
 

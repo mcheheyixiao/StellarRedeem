@@ -240,7 +240,7 @@ public final class RedeemService {
         }
 
         if (claimResult.message() != null && !claimResult.message().isBlank()) {
-            return ChatColor.translateAlternateColorCodes('&', claimResult.message());
+            return pluginConfig.messages().withPrefix(ChatColor.translateAlternateColorCodes('&', claimResult.message()));
         }
 
         if (reason != null && INVALID_REASONS.contains(reason)) {

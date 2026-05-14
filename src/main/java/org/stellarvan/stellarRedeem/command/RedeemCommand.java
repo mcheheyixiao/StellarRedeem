@@ -21,7 +21,7 @@ public final class RedeemCommand implements CommandExecutor {
         PluginConfig pluginConfig = plugin.getPluginConfig();
         RedeemService redeemService = plugin.getRedeemService();
         if (pluginConfig == null || redeemService == null) {
-            sender.sendMessage("StellarRedeem is not ready.");
+            sender.sendMessage(plugin.prefixedMessage("&c繁星兑换尚未完成初始化。"));
             return true;
         }
 

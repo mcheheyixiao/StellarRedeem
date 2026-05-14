@@ -34,12 +34,12 @@ context:
   include-player-ip: false
 
 messages:
-  only-player: "&cThis command can only be used by players."
-  no-permission: "&cYou do not have permission."
-  usage: "&eUsage: /redeem <code>"
-  cooldown: "&cPlease wait {seconds}s before redeeming again."
-  processing: "&eVerifying code, please wait..."
-  success: "&aRedeem success, rewards delivered."
-  invalid: "&cInvalid, expired, or already used code."
-  failed: "&cRedeem failed, please contact an admin."
-  api-error: "&cRedeem service is temporarily unavailable. Try again later."
+  only-player: "&8[&b繁星&f兑换&8] &c该指令只能由玩家在游戏内使用。"
+  no-permission: "&8[&b繁星&f兑换&8] &c你没有使用卡密兑换的权限。"
+  usage: "&8[&b繁星&f兑换&8] &e用法：&f/redeem <卡密>"
+  cooldown: "&8[&b繁星&f兑换&8] &7星轨尚未冷却，请在 &e{seconds} &7秒后再试。"
+  processing: "&8[&b繁星&f兑换&8] &7正在核验星契，请稍候..."
+  success: "&8[&b繁星&f兑换&8] &a兑换成功！&7奖励已送达你的冒险旅程。"
+  invalid: "&8[&b繁星&f兑换&8] &c这份星契已失效、过期，或已被使用。"
+  failed: "&8[&b繁星&f兑换&8] &c兑换流程出现异常，请联系管理员处理。"
+  api-error: "&8[&b繁星&f兑换&8] &c星契服务暂时无法响应，请稍后再试。"

@@ -13,7 +13,8 @@ import org.stellarvan.stellarRedeem.StellarRedeem;
 import org.stellarvan.stellarRedeem.config.PluginConfig;
 
 public final class StellarRedeemAdminCommand implements CommandExecutor, TabCompleter {
-    private static final List<String> SUB_COMMANDS = List.of("reload", "status", "testapi");
+    private static final List<String> SUB_COMMANDS = List.of("help", "reload", "status", "doctor", "testapi");
+    private static final List<String> RELOAD_SUB_COMMANDS = List.of("messages", "api");
     private final StellarRedeem plugin;
 
     public StellarRedeemAdminCommand(StellarRedeem plugin) {
@@ -33,18 +34,35 @@ public final class StellarRedeemAdminCommand implements CommandExecutor, TabComp
         }
 
         if (args.length == 0) {
-            sender.sendMessage("Usage: /stellarredeem <reload|status|testapi>");
+            plugin.handleHelpCommand(sender);
             return true;
         }
 
         String sub = args[0].toLowerCase(Locale.ROOT);
         return switch (sub) {
+            case "help" -> {
+                plugin.handleHelpCommand(sender);
+                yield true;
+            }
             case "reload" -> {
-                plugin.handleReloadCommand(sender);
+                if (args.length == 1) {
+                    plugin.handleReloadCommand(sender);
+                } else {
+                    String reloadTarget = args[1].toLowerCase(Locale.ROOT);
+                    switch (reloadTarget) {
+                        case "messages" -> plugin.handleReloadMessagesCommand(sender);
+                        case "api" -> plugin.handleReloadApiCommand(sender);
+                        default -> plugin.handleHelpCommand(sender);
+                    }
+                }
                 yield true;
             }
             case "status" -> {
                 plugin.handleStatusCommand(sender);
+                yield true;
+            }
+            case "doctor" -> {
+                plugin.handleDoctorCommand(sender);
                 yield true;
             }
             case "testapi" -> {
@@ -52,7 +70,7 @@ public final class StellarRedeemAdminCommand implements CommandExecutor, TabComp
                 yield true;
             }
             default -> {
-                sender.sendMessage("Usage: /stellarredeem <reload|status|testapi>");
+                plugin.handleHelpCommand(sender);
                 yield true;
             }
         };
@@ -68,17 +86,29 @@ public final class StellarRedeemAdminCommand implements CommandExecutor, TabComp
         if (!sender.hasPermission("stellarredeem.admin")) {
             return List.of();
         }
-        if (args.length != 1) {
-            return List.of();
+
+        if (args.length == 1) {
+            String prefix = args[0].toLowerCase(Locale.ROOT);
+            List<String> suggestions = new ArrayList<>();
+            for (String sub : SUB_COMMANDS) {
+                if (sub.startsWith(prefix)) {
+                    suggestions.add(sub);
+                }
+            }
+            return suggestions;
         }
 
-        String prefix = args[0].toLowerCase(Locale.ROOT);
-        List<String> suggestions = new ArrayList<>();
-        for (String sub : SUB_COMMANDS) {
-            if (sub.startsWith(prefix)) {
-                suggestions.add(sub);
+        if (args.length == 2 && "reload".equalsIgnoreCase(args[0])) {
+            String prefix = args[1].toLowerCase(Locale.ROOT);
+            List<String> suggestions = new ArrayList<>();
+            for (String sub : RELOAD_SUB_COMMANDS) {
+                if (sub.startsWith(prefix)) {
+                    suggestions.add(sub);
+                }
             }
+            return suggestions;
         }
-        return suggestions;
+
+        return List.of();
     }
 }

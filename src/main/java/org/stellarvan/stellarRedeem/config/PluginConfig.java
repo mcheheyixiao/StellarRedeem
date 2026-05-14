@@ -5,6 +5,8 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class PluginConfig {
+    private static final String DEFAULT_MESSAGE_PREFIX = "&8[&b繁星&f兑换&8] ";
+
     private final Api api;
     private final Redeem redeem;
     private final Command command;
@@ -35,7 +37,10 @@ public final class PluginConfig {
     }
 
     public static PluginConfig load(JavaPlugin plugin) {
-        FileConfiguration cfg = plugin.getConfig();
+        return load(plugin.getConfig());
+    }
+
+    public static PluginConfig load(FileConfiguration cfg) {
         Api api = new Api(
                 stringValue(cfg, "api.base-url", "https://www.stellarvan.cn"),
                 stringValue(cfg, "api.server-id", "survival-1"),
@@ -72,17 +77,26 @@ public final class PluginConfig {
                 cfg.getBoolean("context.include-player-ip", false)
         );
         Messages messages = new Messages(
-                colorize(stringValue(cfg, "messages.only-player", "&cThis command can only be used by players.")),
-                colorize(stringValue(cfg, "messages.no-permission", "&cYou do not have permission.")),
-                colorize(stringValue(cfg, "messages.usage", "&eUsage: /redeem <code>")),
-                colorize(stringValue(cfg, "messages.cooldown", "&cPlease wait {seconds}s before redeeming again.")),
-                colorize(stringValue(cfg, "messages.processing", "&eVerifying redeem code...")),
-                colorize(stringValue(cfg, "messages.success", "&aRedeem success, rewards delivered.")),
-                colorize(stringValue(cfg, "messages.invalid", "&cInvalid, expired, or already used code.")),
-                colorize(stringValue(cfg, "messages.failed", "&cRedeem failed, contact admin.")),
-                colorize(stringValue(cfg, "messages.api-error", "&cRedeem service is unavailable, try again later."))
+                colorize(stringValue(cfg, "messages.prefix", DEFAULT_MESSAGE_PREFIX)),
+                colorize(stringValue(cfg, "messages.only-player", "&c该指令只能由玩家在游戏内使用。")),
+                colorize(stringValue(cfg, "messages.no-permission", "&c你没有使用卡密兑换的权限。")),
+                colorize(stringValue(cfg, "messages.usage", "&e用法：&f/redeem <卡密>")),
+                colorize(stringValue(cfg, "messages.cooldown", "&7星轨尚未冷却，请在 &e{seconds} &7秒后再试。")),
+                colorize(stringValue(cfg, "messages.processing", "&7正在核验星契，请稍候...")),
+                colorize(stringValue(cfg, "messages.success", "&a兑换成功！&7奖励已送达你的冒险旅程。")),
+                colorize(stringValue(cfg, "messages.invalid", "&c这份星契已失效、过期，或已被使用。")),
+                colorize(stringValue(cfg, "messages.failed", "&c兑换流程出现异常，请联系管理员处理。")),
+                colorize(stringValue(cfg, "messages.api-error", "&c星契服务暂时无法响应，请稍后再试。"))
         );
         return new PluginConfig(api, redeem, command, heartbeat, debug, callbackRetry, context, messages);
+    }
+
+    public PluginConfig withMessages(Messages newMessages) {
+        return new PluginConfig(api, redeem, command, heartbeat, debug, callbackRetry, context, newMessages);
+    }
+
+    public PluginConfig withApi(Api newApi) {
+        return new PluginConfig(newApi, redeem, command, heartbeat, debug, callbackRetry, context, messages);
     }
 
     public Api api() {
@@ -159,6 +173,7 @@ public final class PluginConfig {
     }
 
     public record Messages(
+            String prefix,
             String onlyPlayer,
             String noPermission,
             String usage,
@@ -169,8 +184,60 @@ public final class PluginConfig {
             String failed,
             String apiError
     ) {
+        public String onlyPlayer() {
+            return withPrefix(this.onlyPlayer);
+        }
+
+        public String noPermission() {
+            return withPrefix(this.noPermission);
+        }
+
+        public String usage() {
+            return withPrefix(this.usage);
+        }
+
+        public String processing() {
+            return withPrefix(this.processing);
+        }
+
+        public String success() {
+            return withPrefix(this.success);
+        }
+
+        public String invalid() {
+            return withPrefix(this.invalid);
+        }
+
+        public String failed() {
+            return withPrefix(this.failed);
+        }
+
+        public String apiError() {
+            return withPrefix(this.apiError);
+        }
+
+        public String withPrefix(String message) {
+            String coloredMessage = colorize(message == null ? "" : message);
+            String configuredPrefix = prefix == null ? colorize(DEFAULT_MESSAGE_PREFIX) : prefix;
+            if (configuredPrefix.isEmpty() || coloredMessage.isEmpty()) {
+                return coloredMessage;
+            }
+            if (hasExistingPrefix(message) || hasExistingPrefix(coloredMessage)) {
+                return coloredMessage;
+            }
+            return configuredPrefix + coloredMessage;
+        }
+
         public String cooldownWithSeconds(long seconds) {
-            return cooldown.replace("{seconds}", Long.toString(seconds));
+            return withPrefix(this.cooldown.replace("{seconds}", Long.toString(seconds)));
+        }
+
+        private boolean hasExistingPrefix(String message) {
+            if (message == null) {
+                return false;
+            }
+            String trimmed = message.stripLeading();
+            return trimmed.startsWith("[") || trimmed.startsWith("&8[") || trimmed.startsWith("§8[");
         }
     }
 }
