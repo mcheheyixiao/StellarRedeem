@@ -9,6 +9,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -23,12 +24,14 @@ public final class RedeemApiClient {
     private final PluginApiSigner signer;
     private final Gson gson;
     private final HttpClient httpClient;
+    private final SecureRandom secureRandom;
 
     public RedeemApiClient(JavaPlugin plugin, PluginConfig pluginConfig, PluginApiSigner signer) {
         this.plugin = plugin;
         this.pluginConfig = pluginConfig;
         this.signer = signer;
         this.gson = new Gson();
+        this.secureRandom = new SecureRandom();
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofMillis(Math.max(1000L, pluginConfig.api().timeoutMs())))
                 .build();
@@ -120,7 +123,8 @@ public final class RedeemApiClient {
 
     private HttpResponse<String> postJson(String path, String rawBody) throws ApiClientException {
         long timestamp = Instant.now().getEpochSecond();
-        String signature = signer.sign(timestamp, rawBody);
+        String nonce = generateNonce();
+        String signature = signer.sign(timestamp, nonce, rawBody);
         String url = buildUrl(path);
 
         HttpRequest request = HttpRequest.newBuilder(URI.create(url))
@@ -128,6 +132,7 @@ public final class RedeemApiClient {
                 .header("Content-Type", "application/json")
                 .header("X-Stellar-Server-Id", pluginConfig.api().serverId())
                 .header("X-Stellar-Timestamp", Long.toString(timestamp))
+                .header("X-Stellar-Nonce", nonce)
                 .header("X-Stellar-Signature", signature)
                 .POST(HttpRequest.BodyPublishers.ofString(rawBody, StandardCharsets.UTF_8))
                 .build();
@@ -151,6 +156,21 @@ public final class RedeemApiClient {
             baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
         }
         return baseUrl + path;
+    }
+
+    private String generateNonce() {
+        byte[] bytes = new byte[16];
+        secureRandom.nextBytes(bytes);
+        return toHex(bytes);
+    }
+
+    private String toHex(byte[] data) {
+        StringBuilder builder = new StringBuilder(data.length * 2);
+        for (byte b : data) {
+            builder.append(Character.forDigit((b >> 4) & 0xF, 16));
+            builder.append(Character.forDigit(b & 0xF, 16));
+        }
+        return builder.toString();
     }
 
     private boolean isSuccessStatus(int statusCode) {

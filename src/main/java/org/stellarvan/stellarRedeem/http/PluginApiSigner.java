@@ -11,9 +11,9 @@ public final class PluginApiSigner {
         this.secret = serverSecret.getBytes(StandardCharsets.UTF_8);
     }
 
-    public String sign(long timestampSeconds, String rawBody) {
+    public String sign(long timestampSeconds, String nonce, String rawBody) {
         try {
-            String payload = timestampSeconds + "." + rawBody;
+            String payload = timestampSeconds + "." + nonce + "." + rawBody;
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(secret, "HmacSHA256"));
             byte[] signature = mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
